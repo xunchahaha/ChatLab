@@ -75,11 +75,13 @@ const memberComparisonData = computed(() => {
   return {
     member1: {
       name: sorted[0].name,
+      avatar: sorted[0].avatar,
       count: sorted[0].messageCount,
       percentage: total > 0 ? Math.round((sorted[0].messageCount / total) * 100) : 0,
     },
     member2: {
       name: sorted[1].name,
+      avatar: sorted[1].avatar,
       count: sorted[1].messageCount,
       percentage: total > 0 ? Math.round((sorted[1].messageCount / total) * 100) : 0,
     },
@@ -154,7 +156,15 @@ watch(
         <div class="flex items-center gap-8">
           <!-- 左侧成员 -->
           <div class="flex-1 text-center">
+            <!-- 头像：优先显示真实头像 -->
+            <img
+              v-if="memberComparisonData.member1.avatar"
+              :src="memberComparisonData.member1.avatar"
+              :alt="memberComparisonData.member1.name"
+              class="mx-auto h-16 w-16 rounded-full object-cover"
+            />
             <div
+              v-else
               class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-pink-100 dark:bg-pink-900/30"
             >
               <span class="text-2xl font-bold text-pink-600 dark:text-pink-400">
@@ -192,7 +202,15 @@ watch(
 
           <!-- 右侧成员 -->
           <div class="flex-1 text-center">
+            <!-- 头像：优先显示真实头像 -->
+            <img
+              v-if="memberComparisonData.member2.avatar"
+              :src="memberComparisonData.member2.avatar"
+              :alt="memberComparisonData.member2.name"
+              class="mx-auto h-16 w-16 rounded-full object-cover"
+            />
             <div
+              v-else
               class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30"
             >
               <span class="text-2xl font-bold text-blue-600 dark:text-blue-400">

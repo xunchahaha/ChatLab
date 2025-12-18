@@ -249,6 +249,7 @@ onMounted(() => {
       <PageHeader
         :title="session.name"
         :description="`${dateRangeText}，${selectedYear ? filteredMemberCount : session.memberCount} 位成员共聊了 ${selectedYear ? filteredMessageCount : session.messageCount} 条消息`"
+        :avatar="session.groupAvatar"
         icon="i-heroicons-chat-bubble-left-right"
       >
         <template #actions>

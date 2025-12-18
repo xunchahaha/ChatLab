@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
  * 页面 Header 通用组件
- * 包含标题、描述、可选图标，以及默认 slot 用于额外内容
+ * 包含标题、描述、可选头像/图标，以及默认 slot 用于额外内容
  */
 
 defineProps<{
   title: string
   description?: string
-  icon?: string
+  icon?: string // fallback 图标
+  avatar?: string | null // 头像图片（base64 Data URL），优先级高于 icon
 }>()
 </script>
 
@@ -16,9 +17,16 @@ defineProps<{
     <!-- 标题区域 -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <!-- 可选图标 -->
+        <!-- 头像图片（优先显示） -->
+        <img
+          v-if="avatar"
+          :src="avatar"
+          :alt="title"
+          class="h-10 w-10 rounded-xl object-cover"
+        />
+        <!-- 可选图标（fallback） -->
         <div
-          v-if="icon"
+          v-else-if="icon"
           class="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-pink-400 to-pink-600"
         >
           <UIcon :name="icon" class="h-5 w-5 text-white" />

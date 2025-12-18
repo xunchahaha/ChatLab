@@ -69,6 +69,7 @@ export function getMemberActivity(sessionId: string, filter?: TimeFilter): any[]
         m.id as memberId,
         m.platform_id as platformId,
         COALESCE(m.group_nickname, m.account_name, m.platform_id) as name,
+        m.avatar as avatar,
         COUNT(msg.id) as messageCount
       FROM member m
       LEFT JOIN message msg ON m.id = msg.sender_id ${msgFilterWithSystem}
@@ -82,6 +83,7 @@ export function getMemberActivity(sessionId: string, filter?: TimeFilter): any[]
     memberId: number
     platformId: string
     name: string
+    avatar: string | null
     messageCount: number
   }>
 
@@ -89,6 +91,7 @@ export function getMemberActivity(sessionId: string, filter?: TimeFilter): any[]
     memberId: row.memberId,
     platformId: row.platformId,
     name: row.name,
+    avatar: row.avatar,
     messageCount: row.messageCount,
     percentage: totalMessages > 0 ? Math.round((row.messageCount / totalMessages) * 10000) / 100 : 0,
   }))
@@ -313,6 +316,8 @@ interface DbMeta {
   platform: string
   type: string
   imported_at: number
+  group_id: string | null
+  group_avatar: string | null
 }
 
 /**
@@ -367,6 +372,8 @@ export function getAllSessions(): any[] {
           messageCount,
           memberCount,
           dbPath,
+          groupId: meta.group_id || null,
+          groupAvatar: meta.group_avatar || null,
         })
       }
 
@@ -419,6 +426,8 @@ export function getSession(sessionId: string): any | null {
     messageCount,
     memberCount,
     dbPath: getDbPath(sessionId),
+    groupId: meta.group_id || null,
+    groupAvatar: meta.group_avatar || null,
   }
 }
 
@@ -434,10 +443,13 @@ interface MemberWithStats {
   groupNickname: string | null
   aliases: string[]
   messageCount: number
+  avatar: string | null
 }
 
 // 用于标记已检查过 aliases 字段的会话
 const aliasesCheckedSessions = new Set<string>()
+// 用于标记已检查过 avatar 字段的会话
+const avatarCheckedSessions = new Set<string>()
 
 /**
  * 确保 member 表有 aliases 字段（数据库迁移）
@@ -476,11 +488,48 @@ function ensureAliasesColumn(sessionId: string): void {
 }
 
 /**
- * 获取所有成员列表（含消息数和别名）
+ * 确保 member 表有 avatar 字段（数据库迁移）
+ * 用于兼容旧数据库
+ */
+export function ensureAvatarColumn(sessionId: string): void {
+  // 每个会话只检查一次
+  if (avatarCheckedSessions.has(sessionId)) return
+
+  const dbPath = getDbPath(sessionId)
+  if (!fs.existsSync(dbPath)) return
+
+  // 先关闭可能缓存的只读连接
+  closeDatabase(sessionId)
+
+  // 使用写入模式打开数据库检查并添加字段
+  const db = new Database(dbPath)
+  db.pragma('journal_mode = WAL')
+
+  try {
+    // 检查 avatar 字段是否存在
+    const columns = db.prepare('PRAGMA table_info(member)').all() as Array<{ name: string }>
+    const hasAvatar = columns.some((col) => col.name === 'avatar')
+
+    if (!hasAvatar) {
+      // 添加 avatar 字段
+      db.exec('ALTER TABLE member ADD COLUMN avatar TEXT')
+      console.log(`[Worker] Added avatar column to member table in session ${sessionId}`)
+    }
+
+    // 标记为已检查
+    avatarCheckedSessions.add(sessionId)
+  } finally {
+    db.close()
+  }
+}
+
+/**
+ * 获取所有成员列表（含消息数、别名和头像）
  */
 export function getMembers(sessionId: string): MemberWithStats[] {
-  // 先确保数据库有 aliases 字段（兼容旧数据库）
+  // 先确保数据库有 aliases 和 avatar 字段（兼容旧数据库）
   ensureAliasesColumn(sessionId)
+  ensureAvatarColumn(sessionId)
 
   const db = openDatabase(sessionId)
   if (!db) return []
@@ -494,6 +543,7 @@ export function getMembers(sessionId: string): MemberWithStats[] {
         m.account_name as accountName,
         m.group_nickname as groupNickname,
         m.aliases,
+        m.avatar,
         COUNT(msg.id) as messageCount
       FROM member m
       LEFT JOIN message msg ON m.id = msg.sender_id
@@ -508,6 +558,7 @@ export function getMembers(sessionId: string): MemberWithStats[] {
     accountName: string | null
     groupNickname: string | null
     aliases: string | null
+    avatar: string | null
     messageCount: number
   }>
 
@@ -518,6 +569,7 @@ export function getMembers(sessionId: string): MemberWithStats[] {
     groupNickname: row.groupNickname,
     aliases: row.aliases ? JSON.parse(row.aliases) : [],
     messageCount: row.messageCount,
+    avatar: row.avatar,
   }))
 }
 

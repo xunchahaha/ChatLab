@@ -58,13 +58,16 @@ export function createTempDatabase(dbPath: string): Database.Database {
     CREATE TABLE IF NOT EXISTS meta (
       name TEXT NOT NULL,
       platform TEXT NOT NULL,
-      type TEXT NOT NULL
+      type TEXT NOT NULL,
+      group_id TEXT,
+      group_avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member (
       platform_id TEXT PRIMARY KEY,
       account_name TEXT,
-      group_nickname TEXT
+      group_nickname TEXT,
+      avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS message (
@@ -101,10 +104,10 @@ export class TempDbWriter {
 
     // 准备语句
     this.insertMeta = this.db.prepare(`
-      INSERT INTO meta (name, platform, type) VALUES (?, ?, ?)
+      INSERT INTO meta (name, platform, type, group_id, group_avatar) VALUES (?, ?, ?, ?, ?)
     `)
     this.insertMember = this.db.prepare(`
-      INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname) VALUES (?, ?, ?)
+      INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname, avatar) VALUES (?, ?, ?, ?)
     `)
     this.insertMessage = this.db.prepare(`
       INSERT INTO message (sender_platform_id, sender_account_name, sender_group_nickname, timestamp, type, content)
@@ -119,7 +122,7 @@ export class TempDbWriter {
    * 写入元信息
    */
   writeMeta(meta: ParsedMeta): void {
-    this.insertMeta.run(meta.name, meta.platform, meta.type)
+    this.insertMeta.run(meta.name, meta.platform, meta.type, meta.groupId || null, meta.groupAvatar || null)
   }
 
   /**
@@ -129,7 +132,7 @@ export class TempDbWriter {
     for (const m of members) {
       if (!this.memberSet.has(m.platformId)) {
         this.memberSet.add(m.platformId)
-        this.insertMember.run(m.platformId, m.accountName || null, m.groupNickname || null)
+        this.insertMember.run(m.platformId, m.accountName || null, m.groupNickname || null, m.avatar || null)
       }
     }
   }
@@ -139,10 +142,10 @@ export class TempDbWriter {
    */
   writeMessages(messages: ParsedMessage[]): void {
     for (const msg of messages) {
-      // 确保成员存在
+      // 确保成员存在（消息中没有头像信息，设为 null）
       if (!this.memberSet.has(msg.senderPlatformId)) {
         this.memberSet.add(msg.senderPlatformId)
-        this.insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null)
+        this.insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null, null)
       }
 
       this.insertMessage.run(
@@ -202,13 +205,15 @@ export class TempDbReader {
    */
   getMeta(): ParsedMeta | null {
     const row = this.db.prepare('SELECT * FROM meta LIMIT 1').get() as
-      | { name: string; platform: string; type: string }
+      | { name: string; platform: string; type: string; group_id: string | null; group_avatar: string | null }
       | undefined
     if (!row) return null
     return {
       name: row.name,
       platform: row.platform,
       type: row.type as 'group' | 'private',
+      groupId: row.group_id || undefined,
+      groupAvatar: row.group_avatar || undefined,
     }
   }
 
@@ -220,11 +225,13 @@ export class TempDbReader {
       platform_id: string
       account_name: string | null
       group_nickname: string | null
+      avatar: string | null
     }>
     return rows.map((r) => ({
       platformId: r.platform_id,
       accountName: r.account_name || r.platform_id, // 如果没有账号名称，使用 platformId
       groupNickname: r.group_nickname || undefined,
+      avatar: r.avatar || undefined,
     }))
   }
 

@@ -65,13 +65,16 @@ function createTempDatabase(dbPath: string): Database.Database {
     CREATE TABLE IF NOT EXISTS meta (
       name TEXT NOT NULL,
       platform TEXT NOT NULL,
-      type TEXT NOT NULL
+      type TEXT NOT NULL,
+      group_id TEXT,
+      group_avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member (
       platform_id TEXT PRIMARY KEY,
       account_name TEXT,
-      group_nickname TEXT
+      group_nickname TEXT,
+      avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS message (
@@ -141,7 +144,9 @@ function createDatabaseWithoutIndexes(sessionId: string): Database.Database {
       name TEXT NOT NULL,
       platform TEXT NOT NULL,
       type TEXT NOT NULL,
-      imported_at INTEGER NOT NULL
+      imported_at INTEGER NOT NULL,
+      group_id TEXT,
+      group_avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member (
@@ -149,7 +154,8 @@ function createDatabaseWithoutIndexes(sessionId: string): Database.Database {
       platform_id TEXT NOT NULL UNIQUE,
       account_name TEXT,
       group_nickname TEXT,
-      aliases TEXT DEFAULT '[]'
+      aliases TEXT DEFAULT '[]',
+      avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member_name_history (
@@ -241,10 +247,10 @@ export async function streamImport(filePath: string, requestId: string): Promise
 
   // 准备语句
   const insertMeta = db.prepare(`
-    INSERT INTO meta (name, platform, type, imported_at) VALUES (?, ?, ?, ?)
+    INSERT INTO meta (name, platform, type, imported_at, group_id, group_avatar) VALUES (?, ?, ?, ?, ?, ?)
   `)
   const insertMember = db.prepare(`
-    INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname) VALUES (?, ?, ?)
+    INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname, avatar) VALUES (?, ?, ?, ?)
   `)
   const getMemberId = db.prepare(`SELECT id FROM member WHERE platform_id = ?`)
   const insertMessage = db.prepare(`
@@ -347,14 +353,21 @@ export async function streamImport(filePath: string, requestId: string): Promise
 
       onMeta: (meta: ParsedMeta) => {
         if (!metaInserted) {
-          insertMeta.run(meta.name, meta.platform, meta.type, Math.floor(Date.now() / 1000))
+          insertMeta.run(
+            meta.name,
+            meta.platform,
+            meta.type,
+            Math.floor(Date.now() / 1000),
+            meta.groupId || null,
+            meta.groupAvatar || null
+          )
           metaInserted = true
         }
       },
 
       onMembers: (members: ParsedMember[]) => {
         for (const member of members) {
-          insertMember.run(member.platformId, member.accountName || null, member.groupNickname || null)
+          insertMember.run(member.platformId, member.accountName || null, member.groupNickname || null, member.avatar || null)
           const row = getMemberId.get(member.platformId) as { id: number } | undefined
           if (row) {
             memberIdMap.set(member.platformId, row.id)
@@ -387,7 +400,8 @@ export async function streamImport(filePath: string, requestId: string): Promise
           // 确保成员存在
           let t0 = Date.now()
           if (!memberIdMap.has(msg.senderPlatformId)) {
-            insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null)
+            // 消息中没有头像信息，设为 null
+            insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null, null)
             const row = getMemberId.get(msg.senderPlatformId) as { id: number } | undefined
             if (row) {
               memberIdMap.set(msg.senderPlatformId, row.id)
@@ -683,9 +697,9 @@ export async function streamParseFileInfo(filePath: string, requestId: string): 
   const db = createTempDatabase(tempDbPath)
 
   // 准备语句
-  const insertMeta = db.prepare('INSERT INTO meta (name, platform, type) VALUES (?, ?, ?)')
+  const insertMeta = db.prepare('INSERT INTO meta (name, platform, type, group_id, group_avatar) VALUES (?, ?, ?, ?, ?)')
   const insertMember = db.prepare(
-    'INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname) VALUES (?, ?, ?)'
+    'INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname, avatar) VALUES (?, ?, ?, ?)'
   )
   const insertMessage = db.prepare(`
     INSERT INTO message (sender_platform_id, sender_account_name, sender_group_nickname, timestamp, type, content)
@@ -712,7 +726,13 @@ export async function streamParseFileInfo(filePath: string, requestId: string): 
       onMeta: (parsedMeta) => {
         meta = parsedMeta
         if (!metaInserted) {
-          insertMeta.run(parsedMeta.name, parsedMeta.platform, parsedMeta.type)
+          insertMeta.run(
+            parsedMeta.name,
+            parsedMeta.platform,
+            parsedMeta.type,
+            parsedMeta.groupId || null,
+            parsedMeta.groupAvatar || null
+          )
           metaInserted = true
         }
       },
@@ -721,7 +741,7 @@ export async function streamParseFileInfo(filePath: string, requestId: string): 
         for (const m of parsedMembers) {
           if (!memberSet.has(m.platformId)) {
             memberSet.add(m.platformId)
-            insertMember.run(m.platformId, m.accountName || null, m.groupNickname || null)
+            insertMember.run(m.platformId, m.accountName || null, m.groupNickname || null, m.avatar || null)
           }
         }
       },
@@ -731,7 +751,8 @@ export async function streamParseFileInfo(filePath: string, requestId: string): 
           // 确保成员存在
           if (!memberSet.has(msg.senderPlatformId)) {
             memberSet.add(msg.senderPlatformId)
-            insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null)
+            // 消息中没有头像信息，设为 null
+            insertMember.run(msg.senderPlatformId, msg.senderAccountName || null, msg.senderGroupNickname || null, null)
           }
 
           insertMessage.run(

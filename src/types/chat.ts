@@ -86,7 +86,6 @@ export function getMessageTypeName(type: MessageType | number): string {
 export enum ChatPlatform {
   QQ = 'qq',
   WECHAT = 'wechat',
-  TELEGRAM = 'telegram',
   DISCORD = 'discord',
   MIXED = 'mixed', // 合并的多平台聊天记录
   UNKNOWN = 'unknown',
@@ -110,6 +109,8 @@ export interface DbMeta {
   platform: ChatPlatform // 平台
   type: ChatType // 聊天类型
   imported_at: number // 导入时间戳（秒）
+  group_id: string | null // 群ID（群聊类型有值，私聊为空）
+  group_avatar: string | null // 群头像（base64 Data URL）
 }
 
 /**
@@ -121,6 +122,7 @@ export interface DbMember {
   account_name: string | null // 账号名称（QQ原始昵称 sendNickName）
   group_nickname: string | null // 群昵称（sendMemberName，可为空）
   aliases: string // 用户自定义别名（JSON数组格式）
+  avatar: string | null // 头像（base64 Data URL）
 }
 
 /**
@@ -145,6 +147,7 @@ export interface ParsedMember {
   platformId: string // 平台标识
   accountName: string // 账号名称（QQ原始昵称 sendNickName）
   groupNickname?: string // 群昵称（sendMemberName，可为空）
+  avatar?: string // 头像（base64 Data URL，可为空）
 }
 
 /**
@@ -167,6 +170,8 @@ export interface ParseResult {
     name: string
     platform: ChatPlatform
     type: ChatType
+    groupId?: string // 群ID（群聊类型有值）
+    groupAvatar?: string // 群头像（base64 Data URL）
   }
   members: ParsedMember[]
   messages: ParsedMessage[]
@@ -183,6 +188,7 @@ export interface MemberActivity {
   name: string
   messageCount: number
   percentage: number // 占总消息的百分比
+  avatar?: string | null // 成员头像（base64 Data URL）
 }
 
 /**
@@ -195,6 +201,7 @@ export interface MemberWithStats {
   groupNickname: string | null // 群昵称
   aliases: string[] // 用户自定义别名
   messageCount: number
+  avatar: string | null // 头像（base64 Data URL）
 }
 
 /**
@@ -395,6 +402,8 @@ export interface AnalysisSession {
   messageCount: number // 消息总数
   memberCount: number // 成员数
   dbPath: string // 数据库文件完整路径
+  groupId: string | null // 群ID（群聊类型有值，私聊为空）
+  groupAvatar: string | null // 群头像（base64 Data URL）
 }
 
 /**
@@ -783,9 +792,10 @@ export interface CheckInAnalysis {
  * ChatLab 格式版本信息
  */
 export interface ChatLabHeader {
-  version: string // 格式版本，如 "1.0.0"
+  version: string // 格式版本，如 "0.0.1"
   exportedAt: number // 导出时间戳（秒）
-  generator: string // 生成工具名称
+  generator?: string // 生成工具名称（可选）
+  description?: string // 描述信息（可选，自定义内容）
 }
 
 /**
@@ -805,6 +815,8 @@ export interface ChatLabMeta {
   platform: ChatPlatform // 平台（合并时为 mixed）
   type: ChatType // 聊天类型
   sources?: MergeSource[] // 合并来源（可选）
+  groupId?: string // 群ID（可选，仅群聊）
+  groupAvatar?: string // 群头像（base64 Data URL，可选）
 }
 
 /**
@@ -815,6 +827,7 @@ export interface ChatLabMember {
   accountName: string // 账号名称
   groupNickname?: string // 群昵称（可选）
   aliases?: string[] // 用户自定义别名（可选）
+  avatar?: string // 头像（base64 Data URL，可选）
 }
 
 /**
@@ -938,6 +951,7 @@ export interface ChatRecordMessage {
   senderName: string
   senderPlatformId: string
   senderAliases: string[]
+  senderAvatar: string | null // 发送者头像
   content: string
   timestamp: number
   type: number

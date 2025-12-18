@@ -391,11 +391,16 @@ export async function mergeFilesWithTempDb(
           if (member.groupNickname) {
             existing.groupNickname = member.groupNickname
           }
+          // 头像使用最新的（覆盖更新）
+          if (member.avatar) {
+            existing.avatar = member.avatar
+          }
         } else {
           memberMap.set(member.platformId, {
             platformId: member.platformId,
             accountName: member.accountName,
             groupNickname: member.groupNickname,
+            avatar: member.avatar,
           })
         }
       }
@@ -453,6 +458,14 @@ export async function mergeFilesWithTempDb(
     const platforms = new Set(parseResults.map((r) => r.meta.platform))
     const platform = platforms.size === 1 ? parseResults[0].meta.platform : 'mixed'
 
+    // 确定群ID和群头像（仅当所有文件都来自同一个群时保留）
+    const groupIds = new Set(parseResults.map((r) => r.meta.groupId).filter(Boolean))
+    const groupId = groupIds.size === 1 ? parseResults.find((r) => r.meta.groupId)?.meta.groupId : undefined
+    // 如果有唯一群ID，使用最后一个文件的群头像（可能是最新的）
+    const groupAvatar = groupId
+      ? parseResults.filter((r) => r.meta.groupId === groupId).pop()?.meta.groupAvatar
+      : undefined
+
     // 构建来源信息
     const sources: MergeSource[] = parseResults.map(({ reader, source, meta }) => ({
       filename: source,
@@ -463,15 +476,18 @@ export async function mergeFilesWithTempDb(
     // 构建 ChatLab 格式
     const chatLabData: ChatLabFormat = {
       chatlab: {
-        version: '1.0.0',
+        version: '0.0.1',
         exportedAt: Math.floor(Date.now() / 1000),
         generator: 'ChatLab Merge Tool',
+        description: `合并自 ${parseResults.length} 个文件`,
       },
       meta: {
         name: outputName,
         platform: platform as ChatPlatform,
         type: parseResults[0].meta.type as ChatType,
         sources,
+        groupId,
+        groupAvatar,
       },
       members: Array.from(memberMap.values()),
       messages: mergedMessages,
@@ -497,11 +513,14 @@ export async function mergeFilesWithTempDb(
           name: chatLabData.meta.name,
           platform: chatLabData.meta.platform,
           type: chatLabData.meta.type,
+          groupId: chatLabData.meta.groupId,
+          groupAvatar: chatLabData.meta.groupAvatar,
         },
         members: chatLabData.members.map((m) => ({
           platformId: m.platformId,
           accountName: m.accountName,
           groupNickname: m.groupNickname,
+          avatar: m.avatar,
         })),
         messages: chatLabData.messages.map((msg) => ({
           senderPlatformId: msg.sender,

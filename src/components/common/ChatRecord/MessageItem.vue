@@ -201,10 +201,16 @@ function highlightContent(content: string): string {
     <div class="flex gap-3">
       <!-- 头像 -->
       <div
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white"
-        :class="avatarColor"
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white overflow-hidden"
+        :class="message.senderAvatar ? '' : avatarColor"
       >
-        {{ avatarLetter }}
+        <img
+          v-if="message.senderAvatar"
+          :src="message.senderAvatar"
+          :alt="message.senderName"
+          class="h-full w-full object-cover"
+        />
+        <span v-else>{{ avatarLetter }}</span>
       </div>
 
       <!-- 消息内容区 -->

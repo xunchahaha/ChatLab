@@ -250,7 +250,15 @@ onMounted(() => {
                 <!-- 账号名称 (ID) -->
                 <td class="px-4 py-4">
                   <div class="flex items-center gap-2">
+                    <!-- 头像：优先显示真实头像，否则显示首字母 -->
+                    <img
+                      v-if="member.avatar"
+                      :src="member.avatar"
+                      :alt="getDisplayName(member)"
+                      class="h-8 w-8 shrink-0 rounded-full object-cover"
+                    />
                     <div
+                      v-else
                       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-pink-600 text-xs font-medium text-white"
                     >
                       {{ getFirstChar(member) }}

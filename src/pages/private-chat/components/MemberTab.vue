@@ -118,8 +118,15 @@ onMounted(() => {
       >
         <!-- 成员头部信息 -->
         <div class="flex items-start gap-4">
-          <!-- 头像 -->
+          <!-- 头像：优先显示真实头像，否则显示首字母 -->
+          <img
+            v-if="member.avatar"
+            :src="member.avatar"
+            :alt="getDisplayName(member)"
+            class="h-14 w-14 shrink-0 rounded-full object-cover"
+          />
           <div
+            v-else
             class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-pink-600 text-lg font-medium text-white"
           >
             {{ getFirstChar(member) }}

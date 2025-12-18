@@ -70,7 +70,9 @@ function createDatabase(sessionId: string): Database.Database {
       name TEXT NOT NULL,
       platform TEXT NOT NULL,
       type TEXT NOT NULL,
-      imported_at INTEGER NOT NULL
+      imported_at INTEGER NOT NULL,
+      group_id TEXT,
+      group_avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member (
@@ -78,7 +80,8 @@ function createDatabase(sessionId: string): Database.Database {
       platform_id TEXT NOT NULL UNIQUE,
       account_name TEXT,
       group_nickname TEXT,
-      aliases TEXT DEFAULT '[]'
+      aliases TEXT DEFAULT '[]',
+      avatar TEXT
     );
 
     CREATE TABLE IF NOT EXISTS member_name_history (
@@ -134,18 +137,20 @@ export function importData(parseResult: ParseResult): string {
   try {
     const importTransaction = db.transaction(() => {
       const insertMeta = db.prepare(`
-        INSERT INTO meta (name, platform, type, imported_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO meta (name, platform, type, imported_at, group_id, group_avatar)
+        VALUES (?, ?, ?, ?, ?, ?)
       `)
       insertMeta.run(
         parseResult.meta.name,
         parseResult.meta.platform,
         parseResult.meta.type,
-        Math.floor(Date.now() / 1000)
+        Math.floor(Date.now() / 1000),
+        parseResult.meta.groupId || null,
+        parseResult.meta.groupAvatar || null
       )
 
       const insertMember = db.prepare(`
-        INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname) VALUES (?, ?, ?)
+        INSERT OR IGNORE INTO member (platform_id, account_name, group_nickname, avatar) VALUES (?, ?, ?, ?)
       `)
       const getMemberId = db.prepare(`
         SELECT id FROM member WHERE platform_id = ?
@@ -154,7 +159,7 @@ export function importData(parseResult: ParseResult): string {
       const memberIdMap = new Map<string, number>()
 
       for (const member of parseResult.members) {
-        insertMember.run(member.platformId, member.accountName || null, member.groupNickname || null)
+        insertMember.run(member.platformId, member.accountName || null, member.groupNickname || null, member.avatar || null)
         const row = getMemberId.get(member.platformId) as { id: number }
         memberIdMap.set(member.platformId, row.id)
       }
@@ -312,6 +317,8 @@ export function getAllSessions(): AnalysisSession[] {
           messageCount,
           memberCount,
           dbPath,
+          groupId: meta.group_id || null,
+          groupAvatar: meta.group_avatar || null,
         })
       }
 
@@ -365,6 +372,8 @@ export function getSession(sessionId: string): AnalysisSession | null {
       messageCount,
       memberCount,
       dbPath: getDbPath(sessionId),
+      groupId: meta.group_id || null,
+      groupAvatar: meta.group_avatar || null,
     }
   } finally {
     db.close()

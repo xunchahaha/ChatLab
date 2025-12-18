@@ -5,6 +5,7 @@
  */
 
 import { openDatabase, buildTimeFilter, type TimeFilter } from '../core'
+import { ensureAvatarColumn } from './basic'
 
 // ==================== 类型定义 ====================
 
@@ -16,6 +17,7 @@ export interface MessageResult {
   senderName: string
   senderPlatformId: string
   senderAliases: string[]
+  senderAvatar: string | null
   content: string
   timestamp: number
   type: number
@@ -40,13 +42,14 @@ export interface MessagesWithTotal {
 // ==================== 工具函数 ====================
 
 /**
- * 数据库行类型（包含 aliases JSON 字符串）
+ * 数据库行类型（包含 aliases JSON 字符串和头像）
  */
 interface DbMessageRow {
   id: number
   senderName: string
   senderPlatformId: string
   aliases: string | null
+  avatar: string | null
   content: string
   timestamp: number
   type: number
@@ -72,6 +75,7 @@ function sanitizeMessageRow(row: DbMessageRow): MessageResult {
     senderName: String(row.senderName || ''),
     senderPlatformId: String(row.senderPlatformId || ''),
     senderAliases: aliases,
+    senderAvatar: row.avatar || null,
     content: row.content != null ? String(row.content) : '',
     timestamp: Number(row.timestamp),
     type: Number(row.type),
@@ -119,6 +123,9 @@ export function getRecentMessages(
   filter?: TimeFilter,
   limit: number = 100
 ): MessagesWithTotal {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return { messages: [], total: 0 }
 
@@ -146,6 +153,7 @@ export function getRecentMessages(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -185,6 +193,9 @@ export function searchMessages(
   offset: number = 0,
   senderId?: number
 ): MessagesWithTotal {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return { messages: [], total: 0 }
 
@@ -223,6 +234,7 @@ export function searchMessages(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -257,6 +269,9 @@ export function getMessageContext(
   messageIds: number | number[],
   contextSize: number = 20
 ): MessageResult[] {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return []
 
@@ -305,6 +320,7 @@ export function getMessageContext(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -336,6 +352,9 @@ export function getMessagesBefore(
   senderId?: number,
   keywords?: string[]
 ): PaginatedMessages {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return { messages: [], hasMore: false }
 
@@ -355,6 +374,7 @@ export function getMessagesBefore(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -398,6 +418,9 @@ export function getMessagesAfter(
   senderId?: number,
   keywords?: string[]
 ): PaginatedMessages {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return { messages: [], hasMore: false }
 
@@ -417,6 +440,7 @@ export function getMessagesAfter(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type
@@ -458,6 +482,9 @@ export function getConversationBetween(
   filter?: TimeFilter,
   limit: number = 100
 ): MessagesWithTotal & { member1Name: string; member2Name: string } {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return { messages: [], total: 0, member1Name: '', member2Name: '' }
 
@@ -499,6 +526,7 @@ export function getConversationBetween(
       COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
       m.platform_id as senderPlatformId,
       m.aliases,
+      m.avatar,
       msg.content,
       msg.ts as timestamp,
       msg.type

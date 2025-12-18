@@ -80,7 +80,15 @@ interface EchotraceMessage {
   isSend: number | null // 0=接收, 1=发送, null=系统
   senderUsername: string // 发送者微信ID
   senderDisplayName: string // 发送者显示名
+  senderAvatarKey: string // 头像查找 key（通常与 senderUsername 相同）
   source: string
+}
+
+// ==================== 头像信息结构 ====================
+
+interface EchotraceAvatarInfo {
+  displayName: string
+  base64: string // 原始 base64，不包含 Data URL 前缀
 }
 
 // ==================== 消息类型映射 ====================
@@ -133,6 +141,7 @@ function convertMessageType(typeStr: string): MessageType {
 interface MemberInfo {
   platformId: string
   accountName: string
+  avatar: string | undefined // 头像（base64 Data URL）
 }
 
 // ==================== 解析器实现 ====================
@@ -180,11 +189,178 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
   // 确定聊天名称
   const chatName = session?.displayName || session?.nickname || extractNameFromFilePath(filePath)
 
+  // 提取群ID（群聊类型时有值）
+  // 群ID 格式：以 @chatroom 结尾
+  const groupId = chatType === ChatType.GROUP && session?.wxid ? session.wxid : undefined
+
+  // 解析 avatars 对象（头像）
+  // avatars 格式：{ "wxid": { "displayName": "...", "base64": "..." } }
+  // 注意：base64 不包含 Data URL 前缀，需要添加
+  const avatarsMap = new Map<string, string>()
+
+  /**
+   * 从字符串中提取 avatars 对象内容
+   * 正确处理 JSON 字符串中的花括号匹配（考虑字符串内的转义字符）
+   */
+  function extractAvatarsObject(content: string): string | null {
+    const searchStr = '"avatars":'
+    const startIdx = content.indexOf(searchStr)
+    if (startIdx === -1) return null
+
+    let i = startIdx + searchStr.length
+    // 跳过空白字符
+    while (i < content.length && /\s/.test(content[i])) i++
+
+    if (content[i] !== '{') return null
+
+    // 从 { 开始匹配
+    let braceDepth = 0
+    let inString = false
+    let escape = false
+    const objStart = i
+
+    for (; i < content.length; i++) {
+      const char = content[i]
+
+      if (escape) {
+        escape = false
+        continue
+      }
+
+      if (char === '\\' && inString) {
+        escape = true
+        continue
+      }
+
+      if (char === '"') {
+        inString = !inString
+        continue
+      }
+
+      if (!inString) {
+        if (char === '{') braceDepth++
+        if (char === '}') {
+          braceDepth--
+          if (braceDepth === 0) {
+            return content.slice(objStart, i + 1)
+          }
+        }
+      }
+    }
+
+    return null
+  }
+
+  try {
+    // 先尝试从文件头解析（适用于成员较少的聊天）
+    const avatarsContent = extractAvatarsObject(headContent)
+    if (avatarsContent) {
+      const avatarsObj = JSON.parse(avatarsContent) as Record<string, EchotraceAvatarInfo>
+      for (const [wxid, avatarInfo] of Object.entries(avatarsObj)) {
+        if (avatarInfo && typeof avatarInfo === 'object' && avatarInfo.base64) {
+          // 添加 Data URL 前缀
+          avatarsMap.set(wxid, `data:image/jpeg;base64,${avatarInfo.base64}`)
+        }
+      }
+    }
+  } catch {
+    // avatars 解析失败，继续不带头像
+  }
+
+  // 如果文件头没有完整的 avatars（可能超出 2000 字节），尝试流式读取
+  if (avatarsMap.size === 0) {
+    try {
+      await new Promise<void>((resolve) => {
+        const avatarStream = fs.createReadStream(filePath, { encoding: 'utf-8' })
+
+        let avatarsContent = ''
+        let inAvatars = false
+        let braceDepth = 0
+        let inString = false
+        let escape = false
+
+        avatarStream.on('data', (chunk: string | Buffer) => {
+          const str = typeof chunk === 'string' ? chunk : chunk.toString()
+
+          for (let i = 0; i < str.length; i++) {
+            const char = str[i]
+
+            if (!inAvatars) {
+              // 查找 "avatars": 的位置
+              const searchStr = '"avatars":'
+              if (str.slice(i, i + searchStr.length) === searchStr) {
+                inAvatars = true
+                // 跳过 "avatars": 和可能的空白
+                i += searchStr.length - 1
+                continue
+              }
+            } else {
+              // 开始收集 avatars 对象内容
+              avatarsContent += char
+
+              if (escape) {
+                escape = false
+                continue
+              }
+
+              if (char === '\\' && inString) {
+                escape = true
+                continue
+              }
+
+              if (char === '"') {
+                inString = !inString
+                continue
+              }
+
+              if (!inString) {
+                if (char === '{') braceDepth++
+                if (char === '}') {
+                  braceDepth--
+                  if (braceDepth === 0) {
+                    // avatars 对象结束
+                    avatarStream.destroy()
+                    return
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        avatarStream.on('close', () => {
+          if (avatarsContent) {
+            try {
+              const avatarsObj = JSON.parse(avatarsContent) as Record<string, EchotraceAvatarInfo>
+              for (const [wxid, avatarInfo] of Object.entries(avatarsObj)) {
+                if (avatarInfo && typeof avatarInfo === 'object' && avatarInfo.base64) {
+                  avatarsMap.set(wxid, `data:image/jpeg;base64,${avatarInfo.base64}`)
+                }
+              }
+            } catch {
+              // 解析失败
+            }
+          }
+          resolve()
+        })
+
+        avatarStream.on('error', () => resolve())
+      })
+    } catch {
+      // 流式解析失败，继续不带头像
+    }
+  }
+
+  // 提取群头像（从 avatars 中获取群ID对应的头像）
+  const groupAvatar = groupId ? avatarsMap.get(groupId) : undefined
+
   // 发送 meta
   const meta: ParsedMeta = {
     name: chatName,
     platform: ChatPlatform.WECHAT,
     type: chatType,
+    groupId,
+    groupAvatar,
   }
   yield { type: 'meta', data: meta }
 
@@ -209,18 +385,34 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
       }
 
       const platformId = msg.senderUsername
+
+      // 跳过群"成员"（群ID以 @chatroom 结尾的消息）
+      // 这些通常是系统消息，发送者是群本身，不是真正的成员
+      if (platformId.endsWith('@chatroom')) {
+        return null
+      }
+
       const accountName = msg.senderDisplayName || platformId
+
+      // 获取头像（优先使用 senderAvatarKey，fallback 到 senderUsername）
+      const avatarKey = msg.senderAvatarKey || msg.senderUsername
+      const avatar = avatarsMap.get(avatarKey)
 
       // 更新成员信息
       if (!memberMap.has(platformId)) {
         memberMap.set(platformId, {
           platformId,
           accountName,
+          avatar,
         })
       } else {
         // 更新为最新的显示名
         const existing = memberMap.get(platformId)!
         existing.accountName = accountName
+        // 头像使用最新的（覆盖更新）
+        if (avatar) {
+          existing.avatar = avatar
+        }
       }
 
       // 转换消息类型
@@ -278,6 +470,7 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
   const members: ParsedMember[] = Array.from(memberMap.values()).map((m) => ({
     platformId: m.platformId,
     accountName: m.accountName,
+    avatar: m.avatar,
   }))
   yield { type: 'members', data: members }
 

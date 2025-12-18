@@ -14,29 +14,34 @@ const emit = defineEmits<{
 // 通用格式弹窗状态
 const showFormatModal = ref(false)
 
-// 复制格式示例
+// 复制格式示例（完整版）
 const formatExample = `{
   "chatlab": {
-    "version": "1.0.0",
+    "version": "0.0.1",
     "exportedAt": 1732924800,
-    "generator": "Your Tool Name"
+    "generator": "Your Tool Name",
+    "description": "自定义描述信息"
   },
   "meta": {
     "name": "群聊名称",
     "platform": "qq",
-    "type": "group"
+    "type": "group",
+    "groupId": "123456789",
+    "groupAvatar": "data:image/jpeg;base64,/9j/4AAQ..."
   },
   "members": [
     {
       "platformId": "123456789",
       "accountName": "用户昵称",
-      "groupNickname": "群昵称（可选）"
+      "groupNickname": "群昵称（可选）",
+      "avatar": "data:image/jpeg;base64,/9j/4AAQ..."
     }
   ],
   "messages": [
     {
       "sender": "123456789",
       "accountName": "发送时昵称",
+      "groupNickname": "发送时群昵称（可选）",
       "timestamp": 1732924800,
       "type": 0,
       "content": "消息内容"
@@ -193,85 +198,229 @@ function openExternalLink(url: string) {
         </div>
 
         <!-- 格式说明 -->
-        <div class="space-y-4">
+        <div class="max-h-[60vh] space-y-4 overflow-y-auto">
           <p class="text-sm text-gray-600 dark:text-gray-300">
             ChatLab 定义了一套聊天记录分析用标准 JSON 格式。只需在 JSON 文件中包含
             <code class="rounded bg-gray-100 px-1.5 py-0.5 text-pink-600 dark:bg-gray-800 dark:text-pink-400">
               chatlab
             </code>
-            对象即可被识别。
+            对象即可被识别。以下是完整的格式规范，供开发者参考。
           </p>
 
           <!-- JSON 示例 -->
           <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
             <div class="mb-2 flex items-center justify-between">
-              <span class="text-xs font-medium text-gray-500 dark:text-gray-400">示例格式</span>
+              <span class="text-xs font-medium text-gray-500 dark:text-gray-400">完整示例（含可选字段）</span>
               <UButton variant="ghost" size="xs" icon="i-heroicons-clipboard-document" @click="copyFormatExample">
                 复制
               </UButton>
             </div>
             <pre class="overflow-x-auto text-xs leading-relaxed text-gray-700 dark:text-gray-300"><code>{
   "chatlab": {
-    "version": "1.0.0",
-    "exportedAt": 1732924800,
-    "generator": "Your Tool Name"
+    "version": "0.0.1",           // 必填：格式版本号
+    "exportedAt": 1732924800,     // 必填：导出时间（秒级时间戳）
+    "generator": "Your Tool Name", // 可选：生成工具名称
+    "description": "自定义描述"    // 可选：描述信息（自定义内容）
   },
   "meta": {
-    "name": "群聊名称",
-    "platform": "qq",  // qq | wechat | telegram | discord 等
-    "type": "group"    // group | private （群聊|私聊）
+    "name": "群聊名称",            // 必填：群名/对话名
+    "platform": "qq",             // 必填：qq | wechat | discord | mixed | unknown 等
+    "type": "group",              // 必填：group（群聊）| private（私聊）
+    "groupId": "123456789",       // 可选：群ID（仅群聊）
+    "groupAvatar": "data:image/jpeg;base64,..." // 可选：群头像（Data URL）
   },
   "members": [
     {
-      "platformId": "123456789",
-      "accountName": "用户昵称",
-      "groupNickname": "群昵称（可选）"
+      "platformId": "123456789",  // 必填：用户唯一标识（QQ号/微信ID等）
+      "accountName": "用户昵称",   // 必填：账号名称
+      "groupNickname": "群昵称",   // 可选：群昵称（仅群聊）
+      "avatar": "data:image/jpeg;base64,..." // 可选：用户头像（Data URL）
     }
   ],
   "messages": [
     {
-      "sender": "123456789",
-      "accountName": "发送时昵称",
-      "timestamp": 1732924800,  // 秒级时间戳
-      "type": 0,  // 0=文本 1=图片 2=语音 3=视频
-      "content": "消息内容"
+      "sender": "123456789",      // 必填：发送者 platformId
+      "accountName": "发送时昵称", // 必填：发送时的账号名称
+      "groupNickname": "发送时群昵称", // 可选：发送时的群昵称
+      "timestamp": 1732924800,    // 必填：秒级 Unix 时间戳
+      "type": 0,                  // 必填：消息类型（见下方说明，0=文本）
+      "content": "消息内容"        // 必填：消息内容（null 表示非文本）
     }
   ]
 }</code></pre>
           </div>
 
-          <!-- 字段说明 -->
+          <!-- 消息类型说明 -->
           <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">消息类型说明</h3>
-            <div class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">消息类型 (type)</h3>
+
+            <!-- 基础类型 (0-19) -->
+            <p class="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">基础消息类型 (0-19)</p>
+            <div class="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
               <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                 <span class="font-mono text-pink-600 dark:text-pink-400">0</span>
-                <span class="ml-2 text-gray-600 dark:text-gray-300">文本</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">TEXT 文本</span>
               </div>
               <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                 <span class="font-mono text-pink-600 dark:text-pink-400">1</span>
-                <span class="ml-2 text-gray-600 dark:text-gray-300">图片</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">IMAGE 图片</span>
               </div>
               <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                 <span class="font-mono text-pink-600 dark:text-pink-400">2</span>
-                <span class="ml-2 text-gray-600 dark:text-gray-300">语音</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">VOICE 语音</span>
               </div>
               <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
                 <span class="font-mono text-pink-600 dark:text-pink-400">3</span>
-                <span class="ml-2 text-gray-600 dark:text-gray-300">视频</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">VIDEO 视频</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">4</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">FILE 文件</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">5</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">EMOJI 表情</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">7</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">LINK 链接</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">8</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">LOCATION 位置</span>
+              </div>
+            </div>
+
+            <!-- 交互类型 (20-39) -->
+            <p class="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">交互消息类型 (20-39)</p>
+            <div class="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">20</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">RED_PACKET 红包</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">21</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">TRANSFER 转账</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">22</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">POKE 拍一拍</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">23</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">CALL 通话</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">24</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">SHARE 分享</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">25</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">REPLY 回复</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">26</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">FORWARD 转发</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">27</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">CONTACT 名片</span>
+              </div>
+            </div>
+
+            <!-- 系统/其他 (80+) -->
+            <p class="mb-2 text-xs font-medium text-gray-500 dark:text-gray-400">系统消息类型 (80+)</p>
+            <div class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">80</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">SYSTEM 系统</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">81</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">RECALL 撤回</span>
+              </div>
+              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-700">
+                <span class="font-mono text-pink-600 dark:text-pink-400">99</span>
+                <span class="ml-2 text-gray-600 dark:text-gray-300">OTHER 其他</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 头像格式说明 -->
+          <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">头像格式说明</h3>
+            <p class="mb-2 text-xs text-gray-600 dark:text-gray-300">
+              头像字段（
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">avatar</code>
+              、
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">groupAvatar</code>
+              ）使用 Data URL 格式：
+            </p>
+            <pre
+              class="mb-3 overflow-x-auto rounded-lg bg-gray-50 p-2 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+            ><code>data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...</code></pre>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              支持的 MIME 类型：
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">image/jpeg</code>
+              、
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">image/png</code>
+              、
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">image/gif</code>
+              、
+              <code class="rounded bg-gray-100 px-1 dark:bg-gray-700">image/webp</code>
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">建议导出时压缩处理，100*100像素即可满足需求</p>
+          </div>
+
+          <!-- 字段必要性 -->
+          <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">字段必要性速查</h3>
+            <div class="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+              <div>
+                <h4 class="mb-2 font-medium text-gray-700 dark:text-gray-300">✅ 必填字段</h4>
+                <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                  <li><code class="rounded bg-green-50 px-1 dark:bg-green-900/30">chatlab.version</code></li>
+                  <li><code class="rounded bg-green-50 px-1 dark:bg-green-900/30">chatlab.exportedAt</code></li>
+                  <li>
+                    <code class="rounded bg-green-50 px-1 dark:bg-green-900/30">meta.name / platform / type</code>
+                  </li>
+                  <li>
+                    <code class="rounded bg-green-50 px-1 dark:bg-green-900/30">
+                      members[].platformId / accountName
+                    </code>
+                  </li>
+                  <li><code class="rounded bg-green-50 px-1 dark:bg-green-900/30">messages[] 所有基础字段</code></li>
+                </ul>
+              </div>
+              <div>
+                <h4 class="mb-2 font-medium text-gray-700 dark:text-gray-300">📎 可选字段</h4>
+                <ul class="space-y-1 text-gray-600 dark:text-gray-400">
+                  <li>
+                    <code class="rounded bg-blue-50 px-1 dark:bg-blue-900/30">chatlab.generator / description</code>
+                  </li>
+                  <li><code class="rounded bg-blue-50 px-1 dark:bg-blue-900/30">meta.groupId / groupAvatar</code></li>
+                  <li>
+                    <code class="rounded bg-blue-50 px-1 dark:bg-blue-900/30">members[].groupNickname / avatar</code>
+                  </li>
+                  <li><code class="rounded bg-blue-50 px-1 dark:bg-blue-900/30">messages[].groupNickname</code></li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
 
         <!-- 底部提示 -->
-        <div class="mt-6 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+        <div class="mt-6 space-y-2 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
           <p class="text-sm text-blue-600 dark:text-blue-400">
             💡 文件名只需以
             <code class="rounded bg-blue-100 px-1 dark:bg-blue-800">.json</code>
             结尾，JSON 中包含
             <code class="rounded bg-blue-100 px-1 dark:bg-blue-800">chatlab</code>
             对象即可被识别。
+          </p>
+          <p class="text-xs text-blue-500 dark:text-blue-400/80">
+            📖 完整格式规范请参考项目文档：
+            <code class="rounded bg-blue-100 px-1 dark:bg-blue-800">.docs/guide/chatLabFormat.md</code>
           </p>
         </div>
       </div>

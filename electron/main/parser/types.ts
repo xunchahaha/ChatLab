@@ -14,6 +14,8 @@ export interface ParsedMeta {
   name: string
   platform: ChatPlatform
   type: ChatType
+  groupId?: string // 群ID（群聊类型有值）
+  groupAvatar?: string // 群头像（base64 Data URL）
 }
 
 /**

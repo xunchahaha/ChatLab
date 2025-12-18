@@ -99,6 +99,7 @@ interface MemberInfo {
   platformId: string
   accountName: string // 账号名称（QQ原始昵称 sendNickName）
   groupNickname: string | undefined // 群昵称（sendMemberName，可为空）
+  avatar: string | undefined // 头像（base64 Data URL）
 }
 
 // ==================== 消息类型转换 ====================
@@ -271,6 +272,163 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
   // 如果无法获取 senders 数量，默认为群聊（群聊是更常见的使用场景）
   const chatType = sendersCount > 0 ? (sendersCount > 2 ? ChatType.GROUP : ChatType.PRIVATE) : ChatType.GROUP // 默认为群聊
 
+  // 解析 avatars 对象（头像）
+  // avatars 格式：{ "uin1": "data:image/jpeg;base64,...", "uin2": "..." }
+  // 注意：base64 字符串很长，需要特殊处理匹配花括号
+  const avatarsMap = new Map<string, string>()
+
+  /**
+   * 从字符串中提取 avatars 对象内容
+   * 正确处理 JSON 字符串中的花括号匹配（考虑字符串内的转义字符）
+   */
+  function extractAvatarsObject(content: string): string | null {
+    const searchStr = '"avatars":'
+    const startIdx = content.indexOf(searchStr)
+    if (startIdx === -1) return null
+
+    let i = startIdx + searchStr.length
+    // 跳过空白字符
+    while (i < content.length && /\s/.test(content[i])) i++
+
+    if (content[i] !== '{') return null
+
+    // 从 { 开始匹配
+    let braceDepth = 0
+    let inString = false
+    let escape = false
+    const objStart = i
+
+    for (; i < content.length; i++) {
+      const char = content[i]
+
+      if (escape) {
+        escape = false
+        continue
+      }
+
+      if (char === '\\' && inString) {
+        escape = true
+        continue
+      }
+
+      if (char === '"') {
+        inString = !inString
+        continue
+      }
+
+      if (!inString) {
+        if (char === '{') braceDepth++
+        if (char === '}') {
+          braceDepth--
+          if (braceDepth === 0) {
+            return content.slice(objStart, i + 1)
+          }
+        }
+      }
+    }
+
+    return null
+  }
+
+  try {
+    // 先尝试从文件头解析（适用于成员较少的聊天）
+    const avatarsContent = extractAvatarsObject(headContent)
+    if (avatarsContent) {
+      const avatarsObj = JSON.parse(avatarsContent) as Record<string, string>
+      for (const [uin, avatar] of Object.entries(avatarsObj)) {
+        if (avatar && typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+          avatarsMap.set(uin, avatar)
+        }
+      }
+    }
+  } catch {
+    // avatars 解析失败，继续不带头像
+  }
+
+  // 如果文件头没有完整的 avatars（可能超出 100KB），尝试流式读取
+  if (avatarsMap.size === 0) {
+    try {
+      await new Promise<void>((resolve) => {
+        const avatarStream = fs.createReadStream(filePath, { encoding: 'utf-8' })
+
+        let avatarsContent = ''
+        let inAvatars = false
+        let braceDepth = 0
+        let inString = false
+        let escape = false
+
+        avatarStream.on('data', (chunk: string | Buffer) => {
+          const str = typeof chunk === 'string' ? chunk : chunk.toString()
+
+          for (let i = 0; i < str.length; i++) {
+            const char = str[i]
+
+            if (!inAvatars) {
+              // 查找 "avatars": 的位置
+              const searchStr = '"avatars":'
+              if (str.slice(i, i + searchStr.length) === searchStr) {
+                inAvatars = true
+                // 跳过 "avatars": 和可能的空白
+                i += searchStr.length - 1
+                continue
+              }
+            } else {
+              // 开始收集 avatars 对象内容
+              avatarsContent += char
+
+              if (escape) {
+                escape = false
+                continue
+              }
+
+              if (char === '\\' && inString) {
+                escape = true
+                continue
+              }
+
+              if (char === '"') {
+                inString = !inString
+                continue
+              }
+
+              if (!inString) {
+                if (char === '{') braceDepth++
+                if (char === '}') {
+                  braceDepth--
+                  if (braceDepth === 0) {
+                    // avatars 对象结束
+                    avatarStream.destroy()
+                    return
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        avatarStream.on('close', () => {
+          if (avatarsContent) {
+            try {
+              const avatarsObj = JSON.parse(avatarsContent) as Record<string, string>
+              for (const [uin, avatar] of Object.entries(avatarsObj)) {
+                if (avatar && typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+                  avatarsMap.set(uin, avatar)
+                }
+              }
+            } catch {
+              // 解析失败
+            }
+          }
+          resolve()
+        })
+
+        avatarStream.on('error', () => resolve())
+      })
+    } catch {
+      // 流式解析失败，继续不带头像
+    }
+  }
+
   // 发送 meta
   const meta: ParsedMeta = {
     name: chatInfo.name === '未知群聊' ? extractNameFromFilePath(filePath) : chatInfo.name,
@@ -303,6 +461,9 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
       const accountName = raw?.sendNickName || msg.sender.name || platformId // QQ 原始昵称
       const groupNickname = raw?.sendMemberName || undefined // 群昵称（可为空）
 
+      // 获取头像（通过 uin 查找）
+      const avatar = avatarsMap.get(platformId)
+
       // 更新成员信息（保留最新的名字）
       const existingMember = memberMap.get(platformId)
       if (!existingMember) {
@@ -310,12 +471,17 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
           platformId,
           accountName,
           groupNickname,
+          avatar,
         })
       } else {
         // 更新为最新的名字
         existingMember.accountName = accountName
         if (groupNickname) {
           existingMember.groupNickname = groupNickname
+        }
+        // 头像使用最新的（覆盖更新）
+        if (avatar) {
+          existingMember.avatar = avatar
         }
       }
 
@@ -386,6 +552,7 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
     platformId: m.platformId,
     accountName: m.accountName,
     groupNickname: m.groupNickname,
+    avatar: m.avatar,
   }))
   yield { type: 'members', data: members }
 

@@ -70,6 +70,7 @@ interface ChatLabMember {
   accountName: string // 账号名称
   groupNickname?: string // 群昵称
   aliases?: string[]
+  avatar?: string // 头像（base64 Data URL）
 }
 
 // ==================== 解析器实现 ====================
@@ -125,6 +126,8 @@ async function* parseChatLab(options: ParseOptions): AsyncGenerator<ParseEvent, 
           name: metaObj.name || '未知群聊',
           platform: (metaObj.platform as ChatPlatform) || ChatPlatform.UNKNOWN,
           type: (metaObj.type as ChatType) || ChatType.GROUP,
+          groupId: metaObj.groupId,
+          groupAvatar: metaObj.groupAvatar,
         }
       }
     }
@@ -150,6 +153,7 @@ async function* parseChatLab(options: ParseOptions): AsyncGenerator<ParseEvent, 
           platformId: m.platformId,
           accountName: m.accountName,
           groupNickname: m.groupNickname,
+          avatar: m.avatar,
         })
       }
     }
