@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ImportTutorialModal from './components/ImportTutorialModal.vue'
+import AgreementModal from './components/AgreementModal.vue'
 import { useSessionStore } from '@/stores/session'
 
 const sessionStore = useSessionStore()
@@ -251,5 +252,8 @@ function getProgressDetail(): string {
 
     <!-- 导入教程弹窗 -->
     <ImportTutorialModal v-model:open="showTutorialModal" />
+
+    <!-- 用户协议弹窗 -->
+    <AgreementModal />
   </div>
 </template>

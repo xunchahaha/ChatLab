@@ -38,6 +38,7 @@ const api = {
       'get-gpu-acceleration',
       'set-gpu-acceleration',
       'save-gpu-acceleration',
+      'window-close', // 用户协议拒绝时退出应用
     ]
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data)

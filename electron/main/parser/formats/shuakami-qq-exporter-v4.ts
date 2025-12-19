@@ -1,7 +1,7 @@
 /**
  * shuakami/qq-chat-exporter V4 格式解析器
  * 适配项目: https://github.com/shuakami/qq-chat-exporter
- * 版本: V4.x (2024年12月更新)
+ * 版本: V4.x (2025年12月更新)
  *
  * 文件结构：
  * - metadata: 元数据
