@@ -385,7 +385,7 @@ watch(
                 >
                   官方API
                 </p>
-                <p class="mt-0.5 text-[10px] text-gray-500">DeepSeek、Qwen</p>
+                <p class="mt-0.5 text-[10px] text-gray-500">DeepSeek、Gemini 等</p>
               </div>
             </button>
 

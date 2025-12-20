@@ -5,7 +5,7 @@
 /**
  * 支持的 LLM 提供商
  */
-export type LLMProvider = 'deepseek' | 'qwen' | 'minimax' | 'glm' | 'kimi' | 'openai-compatible'
+export type LLMProvider = 'deepseek' | 'qwen' | 'minimax' | 'glm' | 'kimi' | 'gemini' | 'openai-compatible'
 
 /**
  * LLM 配置
@@ -105,6 +105,8 @@ export interface ToolCall {
     name: string
     arguments: string // JSON 字符串
   }
+  /** Gemini 3+ 模型需要的思考签名（用于工具调用验证） */
+  thoughtSignature?: string
 }
 
 /**

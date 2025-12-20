@@ -21,6 +21,7 @@ import type {
 import { MAX_CONFIG_COUNT } from './types'
 import { DeepSeekService, DEEPSEEK_INFO } from './deepseek'
 import { QwenService, QWEN_INFO } from './qwen'
+import { GeminiService, GEMINI_INFO } from './gemini'
 import { OpenAICompatibleService, OPENAI_COMPATIBLE_INFO } from './openai-compatible'
 import { aiLogger } from '../logger'
 
@@ -72,6 +73,7 @@ const KIMI_INFO: ProviderInfo = {
 export const PROVIDERS: ProviderInfo[] = [
   DEEPSEEK_INFO,
   QWEN_INFO,
+  GEMINI_INFO,
   MINIMAX_INFO,
   GLM_INFO,
   KIMI_INFO,
@@ -325,6 +327,8 @@ export function createLLMService(config: ExtendedLLMConfig): ILLMService {
       return new DeepSeekService(config.apiKey, config.model, config.baseUrl)
     case 'qwen':
       return new QwenService(config.apiKey, config.model, config.baseUrl)
+    case 'gemini':
+      return new GeminiService(config.apiKey, config.model, config.baseUrl)
     // 新增的官方API都使用 OpenAI 兼容格式
     case 'minimax':
     case 'glm':

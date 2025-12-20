@@ -32,18 +32,6 @@ const allSubTabs = [
     icon: 'i-heroicons-adjustments-horizontal',
   },
   {
-    id: 'mbti',
-    label: 'MBTI鉴定',
-    desc: '计划选中成员，然后根据聊天记录以及上下文分析TA的MBTI',
-    icon: 'i-heroicons-heart',
-  },
-  {
-    id: 'cyber-friend',
-    label: '赛博群友计划',
-    desc: '思路：指定某个群友，然后根据聊天记录分析群友的特征，包括口头禅、表情包和标点风格、什么话题他会出现之类的，将这些分析结果打包为系统提示词，并注入AI，就生成了一个赛博群友。实际上可能要复杂一些，但是应该会很好玩。',
-    icon: 'i-heroicons-cpu-chip',
-  },
-  {
     id: 'campus',
     label: '阵营9宫格',
     desc: '和朋友们聊天的时候产生的一个有趣的想法，群里偶尔会很认真的讨论某个话题，那么是不是可以让AI分析聊天记录，然后针对这个话题，让AI用 守序善良/绝对中立/守序邪恶/混乱邪恶 这样的九宫格把群友划分到对应的格子里面',

@@ -42,6 +42,9 @@ export function getAvailableYears(sessionId: string): number[] {
  * 获取成员活跃度排行
  */
 export function getMemberActivity(sessionId: string, filter?: TimeFilter): any[] {
+  // 先确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
   const db = openDatabase(sessionId)
   if (!db) return []
 
