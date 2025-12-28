@@ -2,9 +2,32 @@ import { dialog, app } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { platform } from '@electron-toolkit/utils'
 import { logger } from './logger'
+import { getActiveProxyUrl } from './network/proxy'
+
+/**
+ * 配置自动更新的代理设置
+ * electron-updater 通过环境变量读取代理配置
+ */
+function configureUpdateProxy(): void {
+  const proxyUrl = getActiveProxyUrl()
+
+  if (proxyUrl) {
+    // 设置环境变量，electron-updater 会自动读取
+    process.env.HTTPS_PROXY = proxyUrl
+    process.env.HTTP_PROXY = proxyUrl
+    logger.info(`[Update] 使用代理: ${proxyUrl}`)
+  } else {
+    // 清除代理环境变量
+    delete process.env.HTTPS_PROXY
+    delete process.env.HTTP_PROXY
+  }
+}
 
 let isFirstShow = true
 const checkUpdate = (win) => {
+  // 配置代理
+  configureUpdateProxy()
+
   autoUpdater.autoDownload = false // 自动下载
   autoUpdater.autoInstallOnAppQuit = true // 应用退出后自动安装
 

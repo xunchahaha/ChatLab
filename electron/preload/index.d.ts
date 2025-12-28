@@ -382,6 +382,18 @@ interface CacheApi {
   ) => Promise<{ success: boolean; filePath?: string; error?: string }>
 }
 
+// Network API 类型 - 网络代理配置
+interface ProxyConfig {
+  enabled: boolean
+  url: string
+}
+
+interface NetworkApi {
+  getProxyConfig: () => Promise<ProxyConfig>
+  saveProxyConfig: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>
+  testProxyConnection: (proxyUrl: string) => Promise<{ success: boolean; error?: string }>
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -392,6 +404,7 @@ declare global {
     llmApi: LlmApi
     agentApi: AgentApi
     cacheApi: CacheApi
+    networkApi: NetworkApi
   }
 }
 
@@ -403,11 +416,12 @@ export {
   LlmApi,
   AgentApi,
   CacheApi,
+  NetworkApi,
+  ProxyConfig,
   SearchMessageResult,
   AIConversation,
   AIMessage,
   LLMProviderInfo,
-  LLMConfig,
   AIServiceConfigDisplay,
   LLMChatMessage,
   LLMChatOptions,

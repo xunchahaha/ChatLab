@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { useLayoutStore } from '@/stores/layout'
 import { useColorMode } from '@vueuse/core'
+import NetworkSettingsSection from './NetworkSettingsSection.vue'
 
 // Store
 const layoutStore = useLayoutStore()
@@ -56,5 +57,8 @@ const colorModeOptions = [
         </div>
       </div>
     </div>
+
+    <!-- 网络设置 -->
+    <NetworkSettingsSection />
   </div>
 </template>

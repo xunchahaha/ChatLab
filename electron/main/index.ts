@@ -5,6 +5,7 @@ import * as fs from 'fs/promises'
 import { checkUpdate } from './update'
 import mainIpcMain from './ipcMain'
 import { initAnalytics, trackDailyActive } from './analytics'
+import { initProxy } from './network/proxy'
 
 class MainProcess {
   mainWindow: BrowserWindow | null
@@ -46,6 +47,7 @@ class MainProcess {
   // 初始化程序
   async init() {
     initAnalytics()
+    initProxy() // 初始化代理配置
 
     // 注册应用协议
     app.setAsDefaultProtocolClient('chatlab')

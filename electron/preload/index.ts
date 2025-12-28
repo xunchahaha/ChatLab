@@ -935,6 +935,35 @@ const agentApi = {
   },
 }
 
+// Network API - 网络设置
+interface ProxyConfig {
+  enabled: boolean
+  url: string
+}
+
+const networkApi = {
+  /**
+   * 获取代理配置
+   */
+  getProxyConfig: (): Promise<ProxyConfig> => {
+    return ipcRenderer.invoke('network:getProxyConfig')
+  },
+
+  /**
+   * 保存代理配置
+   */
+  saveProxyConfig: (config: ProxyConfig): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('network:saveProxyConfig', config)
+  },
+
+  /**
+   * 测试代理连接
+   */
+  testProxyConnection: (proxyUrl: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('network:testProxyConnection', proxyUrl)
+  },
+}
+
 // Cache API - 缓存管理
 interface CacheDirectoryInfo {
   id: string
@@ -1057,6 +1086,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('llmApi', llmApi)
     contextBridge.exposeInMainWorld('agentApi', agentApi)
     contextBridge.exposeInMainWorld('cacheApi', cacheApi)
+    contextBridge.exposeInMainWorld('networkApi', networkApi)
   } catch (error) {
     console.error(error)
   }
@@ -1077,4 +1107,6 @@ if (process.contextIsolated) {
   window.agentApi = agentApi
   // @ts-ignore (define in dts)
   window.cacheApi = cacheApi
+  // @ts-ignore (define in dts)
+  window.networkApi = networkApi
 }
