@@ -306,6 +306,174 @@ export function getMentionAnalysis(sessionId: string, filter?: TimeFilter): any 
   }
 }
 
+// ==================== @ 互动关系图数据 ====================
+
+export interface MentionGraphNode {
+  id: number
+  name: string
+  value: number // 消息数量（用于节点大小）
+  symbolSize: number // 节点大小
+}
+
+export interface MentionGraphLink {
+  source: string // 发起者名称
+  target: string // 被艾特者名称
+  value: number // @ 次数
+}
+
+export interface MentionGraphData {
+  nodes: MentionGraphNode[]
+  links: MentionGraphLink[]
+  maxLinkValue: number // 最大边权重（用于归一化）
+}
+
+/**
+ * 获取 @ 互动关系图数据（用于 ECharts Graph）
+ */
+export function getMentionGraph(sessionId: string, filter?: TimeFilter): MentionGraphData {
+  const db = openDatabase(sessionId)
+  const emptyResult: MentionGraphData = { nodes: [], links: [], maxLinkValue: 0 }
+
+  if (!db) return emptyResult
+
+  // 1. 查询所有成员信息和消息数量（不过滤消息数为 0 的成员，因为可能被 @ 但没发消息）
+  const { clause, params } = buildTimeFilter(filter)
+  const msgFilterBase = clause ? clause.replace('WHERE', 'AND') : ''
+  const msgFilterWithSystem = msgFilterBase + " AND COALESCE(m.account_name, '') != '系统消息'"
+
+  const members = db
+    .prepare(
+      `
+      SELECT
+        m.id,
+        m.platform_id as platformId,
+        COALESCE(m.group_nickname, m.account_name, m.platform_id) as name,
+        COUNT(msg.id) as messageCount
+      FROM member m
+      LEFT JOIN message msg ON m.id = msg.sender_id ${msgFilterWithSystem}
+      WHERE COALESCE(m.account_name, '') != '系统消息'
+      GROUP BY m.id
+    `
+    )
+    .all(...params) as Array<{ id: number; platformId: string; name: string; messageCount: number }>
+
+  if (members.length === 0) return emptyResult
+
+  // 2. 构建昵称到成员ID的映射
+  const nameToMemberId = new Map<string, number>()
+  const memberIdToInfo = new Map<number, { name: string; messageCount: number }>()
+
+  for (const member of members) {
+    memberIdToInfo.set(member.id, { name: member.name, messageCount: member.messageCount })
+    nameToMemberId.set(member.name, member.id)
+
+    // 查询历史昵称
+    const history = db
+      .prepare(`SELECT name FROM member_name_history WHERE member_id = ?`)
+      .all(member.id) as Array<{ name: string }>
+
+    for (const h of history) {
+      if (!nameToMemberId.has(h.name)) {
+        nameToMemberId.set(h.name, member.id)
+      }
+    }
+  }
+
+  // 3. 查询包含 @ 的消息
+  let whereClause = clause
+  if (whereClause.includes('WHERE')) {
+    whereClause +=
+      " AND COALESCE(m.account_name, '') != '系统消息' AND msg.type = 0 AND msg.content IS NOT NULL AND msg.content LIKE '%@%'"
+  } else {
+    whereClause =
+      " WHERE COALESCE(m.account_name, '') != '系统消息' AND msg.type = 0 AND msg.content IS NOT NULL AND msg.content LIKE '%@%'"
+  }
+
+  const messages = db
+    .prepare(
+      `
+      SELECT msg.sender_id as senderId, msg.content
+      FROM message msg
+      JOIN member m ON msg.sender_id = m.id
+      ${whereClause}
+    `
+    )
+    .all(...params) as Array<{ senderId: number; content: string }>
+
+  // 4. 解析 @ 并构建关系矩阵
+  const mentionMatrix = new Map<number, Map<number, number>>()
+  const mentionRegex = /@([^\s@]+)/g
+
+  for (const msg of messages) {
+    const matches = msg.content.matchAll(mentionRegex)
+    const mentionedInThisMsg = new Set<number>()
+
+    for (const match of matches) {
+      const mentionedName = match[1]
+      const mentionedId = nameToMemberId.get(mentionedName)
+
+      if (mentionedId && mentionedId !== msg.senderId && !mentionedInThisMsg.has(mentionedId)) {
+        mentionedInThisMsg.add(mentionedId)
+
+        if (!mentionMatrix.has(msg.senderId)) {
+          mentionMatrix.set(msg.senderId, new Map())
+        }
+        const fromMap = mentionMatrix.get(msg.senderId)!
+        fromMap.set(mentionedId, (fromMap.get(mentionedId) || 0) + 1)
+      }
+    }
+  }
+
+  // 5. 构建 nodes（只包含有互动的成员）
+  const involvedMemberIds = new Set<number>()
+  for (const [fromId, toMap] of mentionMatrix.entries()) {
+    involvedMemberIds.add(fromId)
+    for (const toId of toMap.keys()) {
+      involvedMemberIds.add(toId)
+    }
+  }
+
+  const maxMessageCount = Math.max(...members.filter((m) => involvedMemberIds.has(m.id)).map((m) => m.messageCount), 1)
+
+  const nodes: MentionGraphNode[] = []
+  for (const memberId of involvedMemberIds) {
+    const info = memberIdToInfo.get(memberId)
+    if (info) {
+      // 节点大小根据消息数量计算（20-60 范围）
+      const symbolSize = 20 + (info.messageCount / maxMessageCount) * 40
+      nodes.push({
+        id: memberId,
+        name: info.name,
+        value: info.messageCount,
+        symbolSize: Math.round(symbolSize),
+      })
+    }
+  }
+
+  // 6. 构建 links（使用 name 而非 ID，便于前端 ECharts 匹配）
+  const links: MentionGraphLink[] = []
+  let maxLinkValue = 0
+
+  for (const [fromId, toMap] of mentionMatrix.entries()) {
+    const fromInfo = memberIdToInfo.get(fromId)
+    if (!fromInfo) continue
+
+    for (const [toId, count] of toMap.entries()) {
+      const toInfo = memberIdToInfo.get(toId)
+      if (!toInfo) continue
+
+      links.push({
+        source: fromInfo.name,
+        target: toInfo.name,
+        value: count,
+      })
+      maxLinkValue = Math.max(maxLinkValue, count)
+    }
+  }
+
+  return { nodes, links, maxLinkValue }
+}
+
 // ==================== 含笑量分析 ====================
 
 /**

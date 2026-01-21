@@ -273,6 +273,10 @@ export async function getMentionAnalysis(sessionId: string, filter?: any): Promi
   return sendToWorker('getMentionAnalysis', { sessionId, filter })
 }
 
+export async function getMentionGraph(sessionId: string, filter?: any): Promise<any> {
+  return sendToWorker('getMentionGraph', { sessionId, filter })
+}
+
 export async function getLaughAnalysis(sessionId: string, filter?: any, keywords?: string[]): Promise<any> {
   return sendToWorker('getLaughAnalysis', { sessionId, filter, keywords })
 }

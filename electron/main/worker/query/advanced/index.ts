@@ -13,5 +13,6 @@ export { getNightOwlAnalysis, getDragonKingAnalysis, getDivingAnalysis, getCheck
 export { getMonologueAnalysis, getMemeBattleAnalysis } from './behavior'
 
 // 社交分析：@ 互动、含笑量
-export { getMentionAnalysis, getLaughAnalysis } from './social'
+export { getMentionAnalysis, getMentionGraph, getLaughAnalysis } from './social'
+export type { MentionGraphData, MentionGraphNode, MentionGraphLink } from './social'
 

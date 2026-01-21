@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SubTabs } from '@/components/UI'
-import { MessageView, WordcloudView, PortraitView } from '@/components/view'
+import { MessageView, WordcloudView, PortraitView, InteractionView } from '@/components/view'
 import UserSelect from '@/components/common/UserSelect.vue'
 
 const { t } = useI18n()
@@ -18,9 +18,10 @@ const props = defineProps<{
   timeFilter?: TimeFilter
 }>()
 
-// 子 Tab 配置
+// 子 Tab 配置（群聊专属：包含互动分析）
 const subTabs = computed(() => [
   { id: 'message', label: t('message'), icon: 'i-heroicons-chat-bubble-left-right' },
+  { id: 'interaction', label: t('interaction'), icon: 'i-heroicons-arrows-right-left' },
   { id: 'wordcloud', label: t('wordcloud'), icon: 'i-heroicons-cloud' },
   { id: 'portrait', label: t('portrait'), icon: 'i-heroicons-user-circle' },
 ])
@@ -45,6 +46,12 @@ const selectedMemberId = ref<number | null>(null)
       <Transition name="fade" mode="out-in">
         <MessageView
           v-if="activeSubTab === 'message'"
+          :session-id="props.sessionId"
+          :time-filter="props.timeFilter"
+          :member-id="selectedMemberId"
+        />
+        <InteractionView
+          v-else-if="activeSubTab === 'interaction'"
           :session-id="props.sessionId"
           :time-filter="props.timeFilter"
           :member-id="selectedMemberId"
@@ -82,11 +89,13 @@ const selectedMemberId = ref<number | null>(null)
 {
   "zh-CN": {
     "message": "消息",
+    "interaction": "互动分析",
     "wordcloud": "词云",
     "portrait": "对话画像"
   },
   "en-US": {
     "message": "Messages",
+    "interaction": "Interactions",
     "wordcloud": "Word Cloud",
     "portrait": "Chat Portrait"
   }

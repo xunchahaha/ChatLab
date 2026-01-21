@@ -35,6 +35,7 @@ export {
   getMonologueAnalysis,
   getMemeBattleAnalysis,
   getMentionAnalysis,
+  getMentionGraph,
   getLaughAnalysis,
 } from './advanced'
 

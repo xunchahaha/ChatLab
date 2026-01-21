@@ -28,6 +28,13 @@ interface TimeFilter {
   memberId?: number | null // 成员筛选，null 表示全部成员
 }
 
+// @ 互动关系图数据
+interface MentionGraphData {
+  nodes: Array<{ id: number; name: string; value: number; symbolSize: number }>
+  links: Array<{ source: string; target: string; value: number }>
+  maxLinkValue: number
+}
+
 // 迁移相关类型
 interface MigrationInfo {
   version: number
@@ -106,6 +113,7 @@ interface ChatApi {
   getDivingAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<DivingAnalysis>
   getMonologueAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MonologueAnalysis>
   getMentionAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MentionAnalysis>
+  getMentionGraph: (sessionId: string, filter?: TimeFilter) => Promise<MentionGraphData>
   getLaughAnalysis: (sessionId: string, filter?: TimeFilter, keywords?: string[]) => Promise<LaughAnalysis>
   getMemeBattleAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<MemeBattleAnalysis>
   getCheckInAnalysis: (sessionId: string, filter?: TimeFilter) => Promise<CheckInAnalysis>

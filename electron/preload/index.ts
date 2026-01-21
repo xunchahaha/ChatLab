@@ -312,6 +312,20 @@ const chatApi = {
   },
 
   /**
+   * 获取 @ 互动关系图数据
+   */
+  getMentionGraph: (
+    sessionId: string,
+    filter?: { startTs?: number; endTs?: number }
+  ): Promise<{
+    nodes: Array<{ id: number; name: string; value: number; symbolSize: number }>
+    links: Array<{ source: string; target: string; value: number }>
+    maxLinkValue: number
+  }> => {
+    return ipcRenderer.invoke('chat:getMentionGraph', sessionId, filter)
+  },
+
+  /**
    * 获取含笑量分析数据
    */
   getLaughAnalysis: (

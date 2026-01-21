@@ -512,6 +512,21 @@ export function registerChatHandlers(ctx: IpcContext): void {
   )
 
   /**
+   * 获取 @ 互动关系图数据
+   */
+  ipcMain.handle(
+    'chat:getMentionGraph',
+    async (_, sessionId: string, filter?: { startTs?: number; endTs?: number }) => {
+      try {
+        return await worker.getMentionGraph(sessionId, filter)
+      } catch (error) {
+        console.error('获取 @ 互动关系图失败：', error)
+        return { nodes: [], links: [], maxLinkValue: 0 }
+      }
+    }
+  )
+
+  /**
    * 获取含笑量分析数据
    */
   ipcMain.handle(
